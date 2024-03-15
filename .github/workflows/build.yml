@@ -55,10 +55,5 @@ jobs:
       - name: Get .config
         run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > bbr/.config
         
-      - name: Enable BBR TCP
-        run: |
-          echo CONFIG_TCP_CONG_BBR=y >> .config
-          echo CONFIG_NET_SCH_FQ=y >> .config
-        
       - name: Build kernel
         run: make deb-pkg LOCALVERSION=-zeande -j$(nproc)
