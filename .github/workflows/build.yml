@@ -26,7 +26,10 @@ jobs:
           echo "::set-output name=version::$latest_version"
           
       - name: Clone Linux repository
-        run: git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
+        run: |
+          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
+          version_without_prefix=$(echo "$latest_version" | grep -oP '\d+\.\d+')
+          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
         
       - name: Change directory to linux
         run: cd linux/
