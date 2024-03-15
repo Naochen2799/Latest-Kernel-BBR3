@@ -61,14 +61,3 @@ jobs:
         
       - name: Build kernel
         run: make deb-pkg LOCALVERSION=-zeande -j$(nproc)
-
-      - name: Upload kernel deb packages to release
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: https://uploads.github.com/repos/Naochen2799/Lastest-Kernel-BBR3/releases/<release_id>/assets
-          asset_path: |
-            /root/linux-headers-*.deb
-            /root/linux-image-*.deb
-          asset_name: linux-kernel-${{ steps.get_latest_kernel_version.outputs.version }}.deb
-          asset_content_type: application/octet-stream
-          github_token: ${{ secrets.GITHUB_TOKEN }}
