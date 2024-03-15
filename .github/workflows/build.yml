@@ -7,7 +7,7 @@ on:
 
 jobs:
   build_kernel:
-    runs-on: ubuntu-latest
+    runs-on: debian-latest
 
     steps:
       - name: Checkout code
@@ -16,10 +16,17 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen nano -y
+          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen -y
+
+      - name: Get latest stable kernel version from kernel.org
+        id: get_latest_kernel_version
+        run: |
+          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
+          version_without_prefix=$(echo "$latest_version" | grep -oP '\d+\.\d+')
+          echo "::set-output name=version::$latest_version"
           
       - name: Clone Linux repository
-        run: git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$VERSION.y
+        run: git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
         
       - name: Change directory to linux
         run: cd linux/
@@ -32,12 +39,6 @@ jobs:
         
       - name: Checkout Google BBR branch
         run: git checkout google-bbr/v3
-
-      - name: Get latest stable kernel version from kernel.org
-        id: get_latest_kernel_version
-        run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
-          echo "::set-output name=version::$latest_version"
           
       - name: Set kernel version variables
         run: |
