@@ -1,0 +1,74 @@
+name: Build Linux Kernel
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_kernel:
+    runs-on: debian-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen nano -y
+          
+      - name: Clone Linux repository
+        run: git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$VERSION.y
+        
+      - name: Change directory to linux
+        run: cd linux/
+        
+      - name: Add Google BBR remote
+        run: git remote add google-bbr https://github.com/google/bbr.git
+        
+      - name: Fetch Google BBR
+        run: git fetch google-bbr
+        
+      - name: Checkout Google BBR branch
+        run: git checkout google-bbr/v3
+
+      - name: Get latest stable kernel version from kernel.org
+        id: get_latest_kernel_version
+        run: |
+          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
+          echo "::set-output name=version::$latest_version"
+          
+      - name: Set kernel version variables
+        run: |
+          version=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f1)
+          patchlevel=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f2)
+          sublevel=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f3)
+          sed -i "s/VERSION=.*/VERSION=$version/" Makefile
+          sed -i "s/PATCHLEVEL=.*/PATCHLEVEL=$patchlevel/" Makefile
+          sed -i "s/SUBLEVEL=.*/SUBLEVEL=$sublevel/" Makefile
+        
+      - name: Copy kernel config
+        run: cp -v /boot/config-$(uname -r) .config
+        
+      - name: Configure kernel
+        run: make menuconfig
+        
+      - name: Enable BBR TCP
+        run: |
+          echo CONFIG_TCP_CONG_BBR=y >> .config
+          echo CONFIG_NET_SCH_FQ=y >> .config
+        
+      - name: Build kernel
+        run: make deb-pkg LOCALVERSION=-zeande -j$(nproc)
+
+      - name: Upload kernel deb packages to release
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: https://uploads.github.com/repos/Naochen2799/Lastest-Kernel-BBR3/releases/<release_id>/assets
+          asset_path: |
+            /root/linux-headers-*.deb
+            /root/linux-image-*.deb
+          asset_name: linux-kernel-${{ steps.get_latest_kernel_version.outputs.version }}.deb
+          asset_content_type: application/octet-stream
+          github_token: ${{ secrets.GITHUB_TOKEN }}
