@@ -51,12 +51,9 @@ jobs:
           sed -i "s/VERSION=.*/VERSION=$version/" Makefile
           sed -i "s/PATCHLEVEL=.*/PATCHLEVEL=$patchlevel/" Makefile
           sed -i "s/SUBLEVEL=.*/SUBLEVEL=$sublevel/" Makefile
-        
-      - name: Copy kernel config
-        run: cp -v /boot/config-$(uname -r) .config
-        
-      - name: Configure kernel
-        run: make menuconfig
+
+      - name: Get .config
+        run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > bbr/.config
         
       - name: Enable BBR TCP
         run: |
