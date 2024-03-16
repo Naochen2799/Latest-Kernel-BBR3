@@ -16,44 +16,43 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen -y
-
-      - name: Get latest stable kernel version from kernel.org
-        id: get_latest_kernel_version
-        run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
-          version_without_prefix=$(echo "$latest_version" | grep -oP '\d+\.\d+')
-          echo "::set-output name=version::$latest_version"
+          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen nano -y
           
       - name: Clone Linux repository
+        working-directory: root
         run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '(?<=\>)[^<]+')
-          version_without_prefix=$(echo "$latest_version" | grep -oP '\d+\.\d+')
+          version_without_prefix=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
           git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
         
-      - name: Change directory to linux
-        run: cd linux/
-        
-      - name: Add Google BBR remote
-        run: git remote add google-bbr https://github.com/google/bbr.git
-        
-      - name: Fetch Google BBR
-        run: git fetch google-bbr
-        
-      - name: Checkout Google BBR branch
-        run: git checkout google-bbr/v3
+      - name: Add Google BBR
+        working-directory: linux
+        run: |
+          git remote add google-bbr https://github.com/google/bbr.git
+          git fetch google-bbr
+          git checkout google-bbr/v3
           
       - name: Set kernel version variables
+        working-directory: linux
         run: |
-          version=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f1)
-          patchlevel=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f2)
-          sublevel=$(echo ${{ steps.get_latest_kernel_version.outputs.version }} | cut -d. -f3)
+          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+          version=$(echo ${latest_version} | cut -d. -f1)
+          patchlevel=$(echo ${latest_version} | cut -d. -f2)
+          sublevel=$(echo ${latest_version} | cut -d. -f3)
           sed -i "s/VERSION=.*/VERSION=$version/" Makefile
           sed -i "s/PATCHLEVEL=.*/PATCHLEVEL=$patchlevel/" Makefile
           sed -i "s/SUBLEVEL=.*/SUBLEVEL=$sublevel/" Makefile
-
+        
       - name: Get .config
-        run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
+        working-directory: linux
+        run: |
+          curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
         
       - name: Build kernel
+        working-directory: linux
         run: make deb-pkg LOCALVERSION=-zeande -j$(nproc)
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v3
+        with:
+          name: deb
+          path: linux-*.deb
