@@ -60,10 +60,3 @@ jobs:
         with:
           name: deb
           path: linux-*.deb
-
-      - name: GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            linux-*.deb
-          tag: ${{ steps.time.outputs.time }}
