@@ -11,8 +11,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-        sudo apt-get update
-        sudo apt-get install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper -y
+          sudo apt-get update
+          sudo apt-get install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper -y
 
       - name: Create Directory
         run: mkdir ./kernel/
