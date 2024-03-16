@@ -44,7 +44,7 @@ jobs:
       - name: Get .config
         working-directory: linux
         run: |
-          curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
+          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
         
       - name: Build kernel
         working-directory: linux
