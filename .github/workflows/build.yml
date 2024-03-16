@@ -61,4 +61,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: deb
-          path: linux-*.deb
+          path: ./kernel/linux-*.deb
