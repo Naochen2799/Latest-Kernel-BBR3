@@ -19,7 +19,6 @@ jobs:
           sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen nano -y
           
       - name: Clone Linux repository
-        working-directory: root
         run: |
           version_without_prefix=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
           git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
