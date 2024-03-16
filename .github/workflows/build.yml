@@ -37,9 +37,9 @@ jobs:
           version=$(echo ${latest_version} | cut -d. -f1)
           patchlevel=$(echo ${latest_version} | cut -d. -f2)
           sublevel=$(echo ${latest_version} | cut -d. -f3)
-          sed -i "s/VERSION=.*/VERSION=$version/" Makefile
-          sed -i "s/PATCHLEVEL=.*/PATCHLEVEL=$patchlevel/" Makefile
-          sed -i "s/SUBLEVEL=.*/SUBLEVEL=$sublevel/" Makefile
+          sed -i "s/VERSION = .*/VERSION = $version/" Makefile
+          sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
+          sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
         
       - name: Get .config
         working-directory: linux
