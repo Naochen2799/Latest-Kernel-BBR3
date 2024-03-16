@@ -1,15 +1,9 @@
 name: Build Linux Kernel
 
 on:
-  workflow_dispatch:
-    inputs:
-      release:
-        type: choice
-        description: Release type
-        options:
-          - none
-          - pre-release
-          - release
+  push:
+    branches:
+      - main
 
 env:
   SCCACHE_CACHE_SIZE: 9G
