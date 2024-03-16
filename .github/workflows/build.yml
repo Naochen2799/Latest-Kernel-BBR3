@@ -12,6 +12,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Get current time
+        id: time
+        run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
         
       - name: Install dependencies
         run: |
@@ -40,6 +44,7 @@ jobs:
           sed -i "s/VERSION = .*/VERSION = $version/" Makefile
           sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
           sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
+          cat Makefile
         
       - name: Get .config
         working-directory: linux
@@ -48,10 +53,17 @@ jobs:
         
       - name: Build kernel
         working-directory: linux
-        run: make deb-pkg LOCALVERSION="" -j$(nproc)
+        run: make deb-pkg -j$(nproc)
 
       - name: Upload deb
         uses: actions/upload-artifact@v3
         with:
           name: deb
           path: linux-*.deb
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            linux-*.deb
+          tag: ${{ steps.time.outputs.time }}
