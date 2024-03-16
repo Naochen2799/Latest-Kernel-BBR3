@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Install dependencies
         run: |
@@ -43,11 +43,7 @@ jobs:
 
       - name: Setting .config
         working-directory: ./kernel/linux/
-        run: |
-          cp -v /boot/config-$(uname -r) .config
-          sed -i 's/# CONFIG_TCP_CONG_BBR is not set/CONFIG_TCP_CONG_BBR=y/' .config
-          sed -i 's/# CONFIG_TCP_CONG_BBR1 is not set/CONFIG_TCP_CONG_BBR1=y/' .config
-          scripts/config --disable DEBUG_INFO
+        run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
