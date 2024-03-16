@@ -72,19 +72,13 @@ jobs:
             KBUILD_BUILD_TIMESTAMP: ''
             KDEB_COMPRESS: "xz"
           run: |
+            CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*4))
             make \
               LLVM=-18 \
               LOCALVERSION="" \
               CC="sccache clang" \
               HOSTCC="sccache clang" \
-              olddefconfig
-            # Build deb
-            make \
-              LLVM=-18 \
-              LOCALVERSION="" \
-              CC="sccache clang" \
-              HOSTCC="sccache clang" \
-              -j`nproc` \
+              -j"$CPU_CORES" \
               bindeb-pkg
         
         - name: Upload deb
