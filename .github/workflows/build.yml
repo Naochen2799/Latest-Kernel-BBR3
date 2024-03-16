@@ -1,98 +1,68 @@
-name: Build Linux Kernel
+name: Build Kernel With BBRv3
 
-on:
-  push:
-    branches:
-      - main
-
-env:
-  SCCACHE_CACHE_SIZE: 9G
-  SCCACHE_DIR: /home/runner/.cache/sccache
+on: push
 
 jobs:
-    build:
-      runs-on: ubuntu-latest
-      steps:
-        - name: Get current time
-          id: time
-          run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
 
-        - name: Setup dependencies
-          run: |
-            sudo apt-get update
-            sudo apt-fast install -y build-essential \
-              bc kmod cpio flex libncurses5-dev \
-              libelf-dev libssl-dev dwarves bison \
-              gawk openssl libssl-dev dkms libudev-dev \
-              libpci-dev libiberty-dev autoconf \
-              rpm debhelper
-        
-        - name: Set up Clang
-          run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+      - name: Install dependencies
+        run: |
+        sudo apt-get update
+        sudo apt-get install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper -y
 
-        - name: Clone Linux repository
-          run: |
-            version_without_prefix=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-            git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
+      - name: Create Directory
+        run: mkdir ./kernel/
 
-        - name: Add Google BBR
-          working-directory: linux
-          run: |
-            git remote add google-bbr https://github.com/google/bbr.git
-            git fetch google-bbr
-            git checkout google-bbr/v3
-          
-        - name: Set kernel version variables
-          working-directory: linux
-          run: |
-            latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-            version=$(echo ${latest_version} | cut -d. -f1)
-            patchlevel=$(echo ${latest_version} | cut -d. -f2)
-            sublevel=$(echo ${latest_version} | cut -d. -f3)
-            sed -i "s/VERSION = .*/VERSION = $version/" Makefile
-            sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
-            sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
-        
-        - name: Setup sccache
-          uses: mozilla-actions/sccache-action@v0.0.4
+      - name: Download Kernel source code
+        working-directory: ./kernel/
+        run: |
+          version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
+          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version.y
 
-        - name: Get .config
-          working-directory: linux
-          run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
+      - name: Add Google BBRv3
+        working-directory: ./kernel/linux/
+        run: |
+          git remote add google-bbr https://github.com/google/bbr.git
+          git fetch google-bbr
+          git checkout google-bbr/v3
 
-        - name: Setup cache
-          uses: actions/cache@v3
-          with:
-            path: /home/runner/.cache/sccache
-            key: sccache-${{ hashFiles('linux/.config') }}-llvm
-        
-        - name: Build
-          working-directory: linux
-          env:
-            KBUILD_BUILD_TIMESTAMP: ''
-            KDEB_COMPRESS: "xz"
-          run: |
-            CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*4))
-            make \
-              LLVM=-18 \
-              LOCALVERSION="" \
-              CC="sccache clang" \
-              HOSTCC="sccache clang" \
-              -j"$CPU_CORES" \
-              bindeb-pkg
-        
-        - name: Upload deb
-          uses: actions/upload-artifact@v3
-          with:
-            name: deb
-            path: linux-*.deb
+      - name: Set kernel version variables
+        working-directory: ./kernel/linux/
+        run: |
+          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+          version=$(echo ${latest_version} | cut -d. -f1)
+          patchlevel=$(echo ${latest_version} | cut -d. -f2)
+          sublevel=$(echo ${latest_version} | cut -d. -f3)
+          sed -i "s/VERSION = .*/VERSION = $version/" Makefile
+          sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
+          sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
 
-        - name: Release
-          if: ${{ github.event.inputs.release != 'none' }}
-          uses: ncipollo/release-action@v1
-          with:
-            artifacts: "linux-*.deb"
-            prerelease: ${{ github.event.inputs.release == 'pre-release' }}
-            makeLatest: ${{ github.event.inputs.release == 'release' }}
-            tag: ${{ steps.time.outputs.time }}
-        
+      - name: Setting .config
+        working-directory: ./kernel/linux/
+        run: |
+          cp -v /boot/config-$(uname -r) .config
+          sed -i 's/# CONFIG_TCP_CONG_BBR is not set/CONFIG_TCP_CONG_BBR=y/' .config
+          sed -i 's/# CONFIG_TCP_CONG_BBR1 is not set/CONFIG_TCP_CONG_BBR1=y/' .config
+          scripts/config --disable DEBUG_INFO
+
+      - name: Build Kernel
+        working-directory: ./kernel/linux/
+        run: |
+          CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*2))
+          make deb-pkg -j"$CPU_CORES"
+
+      - name: Upload config
+        uses: actions/upload-artifact@v3
+        with:
+          name: config
+          path: ./kernel/linux/.config
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v3
+        with:
+          name: deb
+          path: linux-*.deb
