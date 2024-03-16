@@ -48,7 +48,7 @@ jobs:
         
       - name: Build kernel
         working-directory: linux
-        run: make deb-pkg LOCALVERSION=-zeande -j$(nproc)
+        run: make deb-pkg LOCALVERSION="" -j$(nproc)
 
       - name: Upload deb
         uses: actions/upload-artifact@v3
