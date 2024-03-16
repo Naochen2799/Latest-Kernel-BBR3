@@ -1,62 +1,110 @@
-name: Build Linux Kernel
+name: Build Package
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      release:
+        type: choice
+        description: Release type
+        options:
+          - none
+          - pre-release
+          - release
+
+env:
+  SCCACHE_CACHE_SIZE: 9G
+  SCCACHE_DIR: /home/runner/.cache/sccache
 
 jobs:
-  build_kernel:
-    runs-on: ubuntu-latest
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - name: Get current time
+          id: time
+          run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Get current time
-        id: time
-        run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
+        - name: Setup dependencies
+          run: |
+            sudo apt-get update
+            sudo apt-fast install -y build-essential \
+              bc kmod cpio flex libncurses5-dev \
+              libelf-dev libssl-dev dwarves bison \
+              gawk openssl libssl-dev dkms libudev-dev \
+              libpci-dev libiberty-dev autoconf \
+              rpm debhelper
         
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper screen nano -y
+        - name: Set up Clang
+          run: sudo bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)"
+
+        - name: Clone Linux repository
+          run: |
+            version_without_prefix=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
+            git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
+
+        - name: Add Google BBR
+          working-directory: linux
+          run: |
+            git remote add google-bbr https://github.com/google/bbr.git
+            git fetch google-bbr
+            git checkout google-bbr/v3
           
-      - name: Clone Linux repository
-        run: |
-          version_without_prefix=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version_without_prefix.y
+        - name: Set kernel version variables
+          working-directory: linux
+          run: |
+            latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+            version=$(echo ${latest_version} | cut -d. -f1)
+            patchlevel=$(echo ${latest_version} | cut -d. -f2)
+            sublevel=$(echo ${latest_version} | cut -d. -f3)
+            sed -i "s/VERSION = .*/VERSION = $version/" Makefile
+            sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
+            sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
         
-      - name: Add Google BBR
-        working-directory: linux
-        run: |
-          git remote add google-bbr https://github.com/google/bbr.git
-          git fetch google-bbr
-          git checkout google-bbr/v3
-          
-      - name: Set kernel version variables
-        working-directory: linux
-        run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-          version=$(echo ${latest_version} | cut -d. -f1)
-          patchlevel=$(echo ${latest_version} | cut -d. -f2)
-          sublevel=$(echo ${latest_version} | cut -d. -f3)
-          sed -i "s/VERSION = .*/VERSION = $version/" Makefile
-          sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
-          sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
-          cat Makefile
-        
-      - name: Get .config
-        working-directory: linux
-        run: |
-          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
-        
-      - name: Build kernel
-        working-directory: linux
-        run: make deb-pkg -j$(nproc)
+        - name: Setup sccache
+          uses: mozilla-actions/sccache-action@v0.0.4
 
-      - name: Upload deb
-        uses: actions/upload-artifact@v3
-        with:
-          name: deb
-          path: linux-*.deb
+        - name: Get .config
+          working-directory: linux
+          run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
+
+        - name: Setup cache
+          uses: actions/cache@v3
+          with:
+            path: /home/runner/.cache/sccache
+            key: sccache-${{ hashFiles('linux/.config') }}-llvm
+        
+        - name: Build
+          working-directory: linux
+          env:
+            KBUILD_BUILD_TIMESTAMP: ''
+            KDEB_COMPRESS: "xz"
+          run: |
+            make \
+              LLVM=-18 \
+              LOCALVERSION="" \
+              CC="sccache clang" \
+              HOSTCC="sccache clang" \
+              olddefconfig
+            # Build deb
+            make \
+              LLVM=-18 \
+              LOCALVERSION="" \
+              CC="sccache clang" \
+              HOSTCC="sccache clang" \
+              -j`nproc` \
+              bindeb-pkg
+        
+        - name: Upload deb
+          uses: actions/upload-artifact@v3
+          with:
+            name: deb
+            path: linux-*.deb
+
+        - name: Release
+          if: ${{ github.event.inputs.release != 'none' }}
+          uses: ncipollo/release-action@v1
+          with:
+            artifacts: "linux-*.deb"
+            prerelease: ${{ github.event.inputs.release == 'pre-release' }}
+            makeLatest: ${{ github.event.inputs.release == 'release' }}
+            tag: ${{ steps.time.outputs.time }}
+        
