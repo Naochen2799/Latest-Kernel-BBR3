@@ -50,7 +50,7 @@ jobs:
       - name: Build Kernel
         working-directory: ./kernel/linux/
         run: |
-          make deb-pkg LOCALVERSION=-Naochen2799 -j$(nproc)
+          make deb-pkg -j$(nproc)
 
       - name: Upload config
         uses: actions/upload-artifact@v4
