@@ -46,6 +46,7 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           cp -v /boot/config-$(uname -r) .config
+          make olddefconfig
           scripts/config --enable TCP_CONG_BBR
           scripts/config --enable TCP_CONG_BBR1
           scripts/config --disable DEBUG_INFO
