@@ -20,8 +20,8 @@ jobs:
       - name: Download Kernel source code
         working-directory: ./kernel/
         run: |
-          version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone --single-branch --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version.y
+          git_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
+          git clone --single-branch --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$git_version.y
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
