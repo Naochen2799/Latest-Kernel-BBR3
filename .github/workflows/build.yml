@@ -45,12 +45,7 @@ jobs:
       - name: Setting .config
         working-directory: ./kernel/linux/
         run: |
-          cp -v /boot/config-$(uname -r) .config
-          make olddefconfig
-          scripts/config --enable TCP_CONG_BBR
-          scripts/config --enable TCP_CONG_BBR1
-          scripts/config --disable DEBUG_INFO
-          scripts/config --set-str SYSTEM_TRUSTED_KEYS ""
+          curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
