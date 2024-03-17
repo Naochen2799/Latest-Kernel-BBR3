@@ -22,7 +22,7 @@ jobs:
         working-directory: ./kernel/
         run: |
           git_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone --single-branch --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$git_version.y
+          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$git_version.y
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
@@ -38,9 +38,9 @@ jobs:
           version=$(echo ${latest_version} | cut -d. -f1)
           patchlevel=$(echo ${latest_version} | cut -d. -f2)
           sublevel=$(echo ${latest_version} | cut -d. -f3)
-          sed -i "s/VERSION = .*/VERSION = $version/" Makefile
-          sed -i "s/PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
-          sed -i "s/SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
+          sed -i "s/^VERSION = .*/VERSION = $version/" Makefile
+          sed -i "s/^PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
+          sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
 
       - name: Setting .config
         working-directory: ./kernel/linux/
@@ -50,8 +50,7 @@ jobs:
       - name: Build Kernel
         working-directory: ./kernel/linux/
         run: |
-          CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*2))
-          make deb-pkg -j"$CPU_CORES"
+          make deb-pkg LOCALVERSION=-Naochen2799 -j$(nproc)
 
       - name: Upload config
         uses: actions/upload-artifact@v4
