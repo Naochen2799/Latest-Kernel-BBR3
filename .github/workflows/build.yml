@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
@@ -52,13 +52,13 @@ jobs:
           make deb-pkg -j"$CPU_CORES"
 
       - name: Upload config
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: config
           path: ./kernel/linux/.config
 
       - name: Upload deb
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deb
           path: ./kernel/linux-*.deb
