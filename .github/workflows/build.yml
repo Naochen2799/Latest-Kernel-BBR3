@@ -21,7 +21,7 @@ jobs:
         working-directory: ./kernel/
         run: |
           version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version.y
+          git clone --single-branch --depth=1 https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$version.y
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
@@ -43,12 +43,18 @@ jobs:
 
       - name: Setting .config
         working-directory: ./kernel/linux/
-        run: curl -sSL https://raw.githubusercontent.com/Zxilly/bbr-v3-pkg/master/.config > .config
+        run: |
+          cp -v /boot/config-$(uname -r) .config
+          scripts/config --enable TCP_CONG_BBR
+          scripts/config --enable TCP_CONG_BBR1
+          scripts/config --disable DEBUG_INFO
+          scripts/config --set-str SYSTEM_TRUSTED_KEYS ""
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
         run: |
           CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*2))
+          make clean
           make deb-pkg -j"$CPU_CORES"
 
       - name: Upload config
