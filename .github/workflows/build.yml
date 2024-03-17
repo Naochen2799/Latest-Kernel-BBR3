@@ -1,9 +1,9 @@
 name: Build Kernel With BBRv3
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: 0 17 * * *
+  workflow_dispatch:
 
 jobs:
   build:
