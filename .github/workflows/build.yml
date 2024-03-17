@@ -10,6 +10,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Get current time
+        id: time
+        run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
+
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -44,13 +48,11 @@ jobs:
 
       - name: Setting .config
         working-directory: ./kernel/linux/
-        run: |
-          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
+        run: curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
-        run: |
-          make deb-pkg -j$(nproc)
+        run: make deb-pkg -j$(nproc)
 
       - name: Upload config
         uses: actions/upload-artifact@v4
@@ -63,3 +65,10 @@ jobs:
         with:
           name: deb
           path: ./kernel/linux-*.deb
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@master
+        with:
+          tag_name: ${{ steps.time.outputs.time }}
+          files: ./kernel/linux-*.deb
+          body: latest kernel with BBRv3
