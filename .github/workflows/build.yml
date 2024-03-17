@@ -55,7 +55,6 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           CPU_CORES=$(($(grep -c processor < /proc/cpuinfo)*2))
-          make clean
           make deb-pkg -j"$CPU_CORES"
 
       - name: Upload config
