@@ -15,13 +15,15 @@ get_latest_kernel_urls() {
 }
 
 # 下载内核
-download_kernel() {
-    local url="$1"
-    wget -P /root/bbr3 "$url"
+download_kernels() {
+    local urls=("$@")
+    for url in "${urls[@]}"; do
+        wget -P /root/bbr3 "$url"
+    done
 }
 
 # 安装内核
-install_downloaded_kernel() {
+install_kernels() {
     dpkg -i /root/bbr3/*.deb
 }
 
@@ -31,10 +33,8 @@ main() {
     local kernel_urls
     kernel_urls=($(get_latest_kernel_urls))
     if [ ${#kernel_urls[@]} -gt 0 ]; then
-        for url in "${kernel_urls[@]}"; do
-            download_kernel "$url"
-        done
-        install_downloaded_kernel
+        download_kernels "${kernel_urls[@]}"
+        install_kernels
         echo "安装完成，请重启以启用新内核。"
     else
         echo "无法获取内核下载链接，请检查网络连接或稍后重试。"
