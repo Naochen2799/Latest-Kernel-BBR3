@@ -1,7 +1,9 @@
 这个项目旨在自动化从 kernel.org 获取最新的 stable 版本内核，并编译该内核，同时拉取 Google 的 BBR v3 源码并集成到编译过程中。
 
 ## 安装内核
-bash <(curl -Ls https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/bbr3.sh)
+```shell
+bash <(curl -Ls https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/bbr3.sh) 
+```
 
 ### 启用 bbrv3
 
