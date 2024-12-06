@@ -75,7 +75,7 @@ jobs:
       - name: Setting .config
         working-directory: ./kernel/linux/
         run: |
-          cp /boot/config-$(uname -r) .config
+          curl -sSL https://raw.githubusercontent.com/angrydust/Latest-Kernel-BBR3/main/.config > .config
           if [ "${{ matrix.arch }}" == "arm64" ]; then
             make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           else
