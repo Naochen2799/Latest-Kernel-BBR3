@@ -76,14 +76,15 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           cp /boot/config-$(uname -r) .config
-          scripts/config --disable MODULE_SIG
-          scripts/config --disable DEBUG_INFO
-          scripts/config --enable CONFIG_TCP_BBR
           if [ "${{ matrix.arch }}" == "arm64" ]; then
             make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           else
             make olddefconfig
           fi
+          scripts/config --disable MODULE_SIG
+          scripts/config --disable DEBUG_INFO
+          scripts/config --enable CONFIG_TCP_BBR
+          scripts/config --set-str CONFIG_DEFAULT_TCP_CONG "bbr"
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
