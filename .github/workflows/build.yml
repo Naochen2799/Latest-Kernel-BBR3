@@ -9,7 +9,22 @@ env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
 jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Releases
+        uses: dev-drprasad/delete-older-releases@master
+        with:
+          keep_latest: 0
+          delete_tags: true
+
+      - name: Delete Old Workflows
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          retain_days: 0
+          keep_minimum_runs: 2
   build:
+    needs: cleanup
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -17,18 +32,6 @@ jobs:
     env:
       ARCH: ${{ matrix.arch }}
     steps:
-      - name: Delete Old Releases
-        uses: dev-drprasad/delete-older-releases@master
-        with:
-          keep_latest: 0
-          delete_tags: true
-          
-      - name: Delete Old Workflows
-        uses: Mattraks/delete-workflow-runs@main
-        with:
-          retain_days: 0
-          keep_minimum_runs: 2
-          
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -64,9 +67,7 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-          version=$(echo ${latest_version} | cut -d. -f1)
-          patchlevel=$(echo ${latest_version} | cut -d. -f2)
-          sublevel=$(echo ${latest_version} | cut -d. -f3)
+          IFS='.' read -r version patchlevel sublevel <<< "$latest_version"
           sed -i "s/^VERSION = .*/VERSION = $version/" Makefile
           sed -i "s/^PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
           sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
@@ -74,7 +75,10 @@ jobs:
       - name: Setting .config
         working-directory: ./kernel/linux/
         run: |
-          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
+          cp /boot/config-$(uname -r) .config
+          scripts/config --disable MODULE_SIG
+          scripts/config --disable DEBUG_INFO
+          scripts/config --enable CONFIG_TCP_BBR
           if [ "${{ matrix.arch }}" == "arm64" ]; then
             make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           else
@@ -85,26 +89,26 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           if [ "${{ matrix.arch }}" == "arm64" ]; then
-            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- deb-pkg -j$(nproc)
+            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bindeb-pkg -j$(nproc)
           else
-            make deb-pkg -j$(nproc)
+            make bindeb-pkg -j$(nproc)
           fi
 
       - name: Upload config
         uses: actions/upload-artifact@v4
         with:
-          name: config
+          name: config-${{ matrix.arch }}
           path: ./kernel/linux/.config
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: deb
+          name: deb-${{ matrix.arch }}
           path: ./kernel/linux-*.deb
 
       - name: Upload to release
         uses: softprops/action-gh-release@master
         with:
-          tag_name: ${{ steps.time.outputs.time }}
+          tag_name: ${{ matrix.arch }}-${{ steps.time.outputs.time }}
           files: ./kernel/linux-*.deb
           body: "Latest kernel with BBRv3 for ${{ matrix.arch }} architecture"
