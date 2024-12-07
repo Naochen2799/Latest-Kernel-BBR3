@@ -31,8 +31,14 @@ jobs:
         arch: [x86_64, arm64]
     env:
       ARCH: ${{ matrix.arch }}
-      KERNEL_VERSION: $(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+      KERNEL_VERSION: ""
     steps:
+      - name: Get Kernel Version
+        id: get_kernel_version
+        run: |
+          version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$version" >> $GITHUB_ENV
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -102,6 +108,6 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@master
         with:
-          tag_name: ${{ env.KERNEL_VERSION }}-${{ env.ARCH }}
+          tag_name: ${{ env.ARCH }}-${{ env.KERNEL_VERSION }}
           files: ./kernel/linux-*.deb
           body: "Latest kernel with BBRv3 for ${{ matrix.arch }} architecture"
