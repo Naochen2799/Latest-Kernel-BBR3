@@ -9,7 +9,7 @@ env:
   GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
 
 jobs:
-  build:
+  cleanup:
     runs-on: ubuntu-latest
     steps:
       - name: Delete Old Releases
@@ -17,24 +17,38 @@ jobs:
         with:
           keep_latest: 0
           delete_tags: true
-          
+
       - name: Delete Old Workflows
         uses: Mattraks/delete-workflow-runs@main
         with:
           retain_days: 0
-          keep_minimum_runs: 1
-          
+          keep_minimum_runs: 2
+  build:
+    needs: cleanup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    env:
+      ARCH: ${{ matrix.arch }}
+      KERNEL_VERSION: ""
+    steps:
+      - name: Get Kernel Version
+        id: get_kernel_version
+        run: |
+          version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
+          echo "version=$version" >> $GITHUB_ENV
+
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Get current time
-        id: time
-        run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper -y
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            sudo apt-get install -y gcc-aarch64-linux-gnu
+          fi
 
       - name: Create Directory
         run: mkdir ./kernel/
@@ -42,8 +56,8 @@ jobs:
       - name: Download Kernel source code
         working-directory: ./kernel/
         run: |
-          git_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$git_version.y
+          kernel_branch=$(echo "${{ env.KERNEL_VERSION }}" | grep -oP '^\d+\.\d+')
+          git clone --branch linux-$kernel_branch.y https://github.com/gregkh/linux.git
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
@@ -55,37 +69,45 @@ jobs:
       - name: Set kernel version variables
         working-directory: ./kernel/linux/
         run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-          version=$(echo ${latest_version} | cut -d. -f1)
-          patchlevel=$(echo ${latest_version} | cut -d. -f2)
-          sublevel=$(echo ${latest_version} | cut -d. -f3)
+          IFS='.' read -r version patchlevel sublevel <<< "${{ env.KERNEL_VERSION }}"
           sed -i "s/^VERSION = .*/VERSION = $version/" Makefile
           sed -i "s/^PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
           sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
 
       - name: Setting .config
         working-directory: ./kernel/linux/
-        run: curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
+        run: |
+          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/arm64/.config > .config
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          else
+            make olddefconfig
+          fi
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
-        run: make deb-pkg -j$(nproc)
+        run: |
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bindeb-pkg -j$(nproc)
+          else
+            make bindeb-pkg -j$(nproc)
+          fi
 
       - name: Upload config
         uses: actions/upload-artifact@v4
         with:
-          name: config
+          name: config-${{ matrix.arch }}
           path: ./kernel/linux/.config
 
       - name: Upload deb
         uses: actions/upload-artifact@v4
         with:
-          name: deb
+          name: deb-${{ matrix.arch }}
           path: ./kernel/linux-*.deb
 
       - name: Upload to release
         uses: softprops/action-gh-release@master
         with:
-          tag_name: ${{ steps.time.outputs.time }}
+          tag_name: ${{ env.ARCH }}-${{ env.KERNEL_VERSION }}
           files: ./kernel/linux-*.deb
-          body: latest kernel with BBRv3
+          body: "Latest kernel with BBRv3 for ${{ matrix.arch }} architecture"
