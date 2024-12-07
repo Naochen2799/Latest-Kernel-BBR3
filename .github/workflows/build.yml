@@ -37,7 +37,7 @@ jobs:
         id: get_kernel_version
         run: |
           version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-          echo "version=$version" >> $GITHUB_ENV
+          echo "KERNEL_VERSION=$version" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@v4
