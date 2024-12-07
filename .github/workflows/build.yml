@@ -49,7 +49,9 @@ jobs:
 
       - name: Download Kernel source code
         working-directory: ./kernel/
-        run: git clone --branch linux-${{ env.KERNEL_VERSION }}.y https://github.com/gregkh/linux.git
+        run: |
+          kernel_branch=$(echo "${{ env.KERNEL_VERSION }}" | grep -oP '^\d+\.\d+')
+          git clone --branch linux-$kernel_branch.y https://github.com/gregkh/linux.git
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
