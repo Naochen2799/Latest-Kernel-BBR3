@@ -31,13 +31,10 @@ jobs:
         arch: [x86_64, arm64]
     env:
       ARCH: ${{ matrix.arch }}
+      KERNEL_VERSION: $(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Get current time
-        id: time
-        run: echo "time=$(date -u "+%Y-%m-%d-%H%M%S")" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
         run: |
@@ -52,9 +49,7 @@ jobs:
 
       - name: Download Kernel source code
         working-directory: ./kernel/
-        run: |
-          git_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+' )
-          git clone https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git --branch linux-$git_version.y
+        run: git clone --branch linux-${{ env.KERNEL_VERSION }}.y https://github.com/gregkh/linux.git
 
       - name: Add Google BBRv3
         working-directory: ./kernel/linux/
@@ -66,8 +61,7 @@ jobs:
       - name: Set kernel version variables
         working-directory: ./kernel/linux/
         run: |
-          latest_version=$(curl -s https://www.kernel.org | grep -A 1 -m 1 "stable:" | grep -oP '\d+\.\d+\.\d+')
-          IFS='.' read -r version patchlevel sublevel <<< "$latest_version"
+          IFS='.' read -r version patchlevel sublevel <<< "${{ env.KERNEL_VERSION }}"
           sed -i "s/^VERSION = .*/VERSION = $version/" Makefile
           sed -i "s/^PATCHLEVEL = .*/PATCHLEVEL = $patchlevel/" Makefile
           sed -i "s/^SUBLEVEL = .*/SUBLEVEL = $sublevel/" Makefile
@@ -75,16 +69,12 @@ jobs:
       - name: Setting .config
         working-directory: ./kernel/linux/
         run: |
-          curl -sSL https://raw.githubusercontent.com/angrydust/Latest-Kernel-BBR3/main/.config > .config
+          curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/arm64/.config > .config
           if [ "${{ matrix.arch }}" == "arm64" ]; then
             make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           else
             make olddefconfig
           fi
-          scripts/config --disable MODULE_SIG
-          scripts/config --disable DEBUG_INFO
-          scripts/config --enable CONFIG_TCP_BBR
-          scripts/config --set-str CONFIG_DEFAULT_TCP_CONG "bbr"
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
@@ -110,6 +100,6 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@master
         with:
-          tag_name: ${{ matrix.arch }}-${{ steps.time.outputs.time }}
+          tag_name: ${{ env.KERNEL_VERSION }}-${{ env.ARCH }}
           files: ./kernel/linux-*.deb
           body: "Latest kernel with BBRv3 for ${{ matrix.arch }} architecture"
