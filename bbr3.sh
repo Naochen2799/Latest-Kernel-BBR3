@@ -3,7 +3,7 @@
 # 安装依赖项
 install_dependencies() {
     apt update
-    apt install wget curl -y
+    apt install wget curl jq -y
 }
 
 # 获取最新内核版本号
@@ -20,21 +20,40 @@ get_system_arch() {
     case $arch in
         x86_64) echo "x86_64" ;;
         aarch64) echo "arm64" ;;
-        *) echo "不支持的系统架构，请提交issues" ;;
+        *) echo "unsupported" ;;
     esac
 }
 
-# 下载指定版本和架构下的内核包
-download_all_deb_files() {
+# 从GitHub API获取最新版本的真实下载链接
+get_download_url_from_api() {
     local arch=$1
     local version=$2
-    local base_url="https://github.com/Naochen2799/Latest-Kernel-BBR3/releases/download/${arch}-${version}/"
-    local download_dir="/root/bbr3"
+    local api_url="https://api.github.com/repos/Naochen2799/Latest-Kernel-BBR3/releases/tags/${arch}-${version}"
     
+    # 获取下载链接
+    local download_url
+    download_url=$(curl -s $api_url | jq -r '.assets[] | select(.name | endswith(".deb")) | .browser_download_url')
+}
+
+# 下载指定版本和架构下的所有文件
+download_all_files() {
+    local arch=$1
+    local version=$2
+    
+    # 获取真实下载链接
+    local download_url
+    download_url=$(get_download_url_from_api "$arch" "$version")
+    
+    if [ -z "$download_url" ]; then
+        echo "无法获取下载链接，请检查版本号或架构。"
+        exit 1
+    fi
+    
+    local download_dir="/root/bbr3"
     mkdir -p "$download_dir"
 
-    echo "正在从 $base_url 下载所有内核包..."
-    wget -r -np -nd -P "$download_dir" -A "*.deb" "$base_url" || {
+    echo "正在从 $download_url 下载内核包..."
+    wget -e robots=off -r -np -nd -P "$download_dir" "$download_url" || {
         echo "下载失败，请检查链接是否正确或网络连接状态。"
         exit 1
     }
@@ -60,8 +79,8 @@ main() {
 
     if [ -n "$version" ]; then
         echo "检测到最新内核版本：$version"
-        echo "开始下载内核包..."
-        download_all_deb_files "$arch" "$version"
+        echo "开始下载所有内核包..."
+        download_all_files "$arch" "$version"
 
         echo "安装内核包..."
         install_kernels
