@@ -17,30 +17,30 @@ get_latest_kernel_version() {
 get_system_arch() {
     local arch
     arch=$(uname -m)
-    echo $arch
+    case $arch in
+        x86_64) echo "x86_64" ;;
+        aarch64) echo "arm64" ;;
+        *) echo "不支持的系统架构，请提交issues" ;;
+    esac
 }
 
-# 根据系统架构获取下载链接
-get_download_link() {
+# 下载指定版本和架构下的内核包
+download_all_deb_files() {
     local arch=$1
     local version=$2
-    if [ "$arch" == "x86_64" ]; then
-        echo "https://github.com/Naochen2799/Latest-Kernel-BBR3/releases/tag/x86_64-$version"
-    elif [ "$arch" == "aarch64" ]; then
-        echo "https://github.com/Naochen2799/Latest-Kernel-BBR3/releases/tag/arm64-$version"
-    else
-        echo "不支持的系统架构：$arch"
+    local base_url="https://github.com/Naochen2799/Latest-Kernel-BBR3/releases/download/${arch}-${version}/"
+    local download_dir="/root/bbr3"
+    
+    mkdir -p "$download_dir"
+
+    echo "正在从 $base_url 下载所有内核包..."
+    wget -r -np -nd -P "$download_dir" -A "*.deb" "$base_url" || {
+        echo "下载失败，请检查链接是否正确或网络连接状态。"
         exit 1
-    fi
+    }
 }
 
-# 下载内核
-download_kernels() {
-    local url=$1
-    wget -P /root/bbr3 "$url"
-}
-
-# 安装内核
+# 安装内核文件
 install_kernels() {
     dpkg -i /root/bbr3/*.deb
 }
@@ -52,17 +52,21 @@ main() {
     version=$(get_latest_kernel_version)
     local arch
     arch=$(get_system_arch)
-    if [ -n "$version" ] && [ -n "$arch" ]; then
-        local download_link
-        download_link=$(get_download_link "$arch" "$version")
-        if [ -n "$download_link" ]; then
-            download_kernels "$download_link"
-            install_kernels
-            echo "安装完成，请重启以启用新内核。"
-        else
-            echo "无法获取内核下载链接，请稍后重试。"
-            exit 1
-        fi
+
+    if [ "$arch" == "unsupported" ]; then
+        echo "不支持的系统架构：$arch"
+        exit 1
+    fi
+
+    if [ -n "$version" ]; then
+        echo "检测到最新内核版本：$version"
+        echo "开始下载内核包..."
+        download_all_deb_files "$arch" "$version"
+
+        echo "安装内核包..."
+        install_kernels
+
+        echo "内核安装完成，请重启系统以应用新内核。"
     else
         echo "无法获取最新内核版本信息，请检查网络连接或稍后重试。"
         exit 1
