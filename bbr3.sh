@@ -25,14 +25,22 @@ get_system_arch() {
 }
 
 # 从GitHub API获取最新版本的真实下载链接
-get_download_url_from_api() {
+get_download_urls_from_api() {
     local arch=$1
     local version=$2
     local api_url="https://api.github.com/repos/Naochen2799/Latest-Kernel-BBR3/releases/tags/${arch}-${version}"
     
-    # 获取下载链接
-    local download_url
-    download_url=$(curl -s $api_url | jq -r '.assets[] | select(.name | endswith(".deb")) | .browser_download_url')
+    # 获取下载链接数组
+    local download_urls
+    download_urls=$(curl -s $api_url | jq -r '.assets[] | select(.name | endswith(".deb")) | .browser_download_url')
+    
+    # 将下载链接存入数组
+    local urls_array=()
+    while IFS= read -r url; do
+        urls_array+=("$url")
+    done <<< "$download_urls"
+    
+    echo "${urls_array[@]}"
 }
 
 # 下载指定版本和架构下的所有文件
@@ -40,11 +48,10 @@ download_all_files() {
     local arch=$1
     local version=$2
     
-    # 获取真实下载链接
-    local download_url
-    download_url=$(get_download_url_from_api "$arch" "$version")
+    # 获取真实下载链接数组
+    IFS=' ' read -r -a download_urls <<< "$(get_download_urls_from_api "$arch" "$version")"
     
-    if [ -z "$download_url" ]; then
+    if [ ${#download_urls[@]} -eq 0 ]; then
         echo "无法获取下载链接，请检查版本号或架构。"
         exit 1
     fi
@@ -52,11 +59,13 @@ download_all_files() {
     local download_dir="/root/bbr3"
     mkdir -p "$download_dir"
 
-    echo "正在从 $download_url 下载内核包..."
-    wget -e robots=off -r -np -nd -P "$download_dir" "$download_url" || {
-        echo "下载失败，请检查链接是否正确或网络连接状态。"
-        exit 1
-    }
+    echo "正在从下载链接下载所有内核包..."
+    for url in "${download_urls[@]}"; do
+        wget -e robots=off -P "$download_dir" "$url" || {
+            echo "下载失败，请检查链接是否正确或网络连接状态。"
+            exit 1
+        }
+    done
 }
 
 # 安装内核文件
