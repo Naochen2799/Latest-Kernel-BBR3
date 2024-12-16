@@ -106,7 +106,7 @@ jobs:
           path: ./kernel/linux-*.deb
 
       - name: Upload to release
-        uses: softprops/action-gh-release@master
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.ARCH }}-${{ env.KERNEL_VERSION }}
           files: ./kernel/linux-*.deb
