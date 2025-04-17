@@ -23,12 +23,17 @@ jobs:
         with:
           retain_days: 0
           keep_minimum_runs: 2
+
   build:
     needs: cleanup
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64, arm64]
+        include:
+          - arch: x86_64
+            runs_on: ubuntu-latest
+          - arch: arm64
+            runs_on: ubuntu-22.04-arm64
+    runs-on: ${{ matrix.runs_on }}
     env:
       ARCH: ${{ matrix.arch }}
       KERNEL_VERSION: ""
@@ -45,10 +50,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper -y
-          if [ "${{ matrix.arch }}" == "arm64" ]; then
-            sudo apt-get install -y gcc-aarch64-linux-gnu
-          fi
+          sudo apt-get install -y git build-essential libncurses-dev libssl-dev libelf-dev bison bc flex rsync debhelper
 
       - name: Create Directory
         run: mkdir ./kernel/
@@ -78,20 +80,12 @@ jobs:
         working-directory: ./kernel/linux/
         run: |
           curl -sSL https://raw.githubusercontent.com/Naochen2799/Latest-Kernel-BBR3/main/.config > .config
-          if [ "${{ matrix.arch }}" == "arm64" ]; then
-            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-          else
-            make olddefconfig
-          fi
+          make olddefconfig
 
       - name: Build Kernel
         working-directory: ./kernel/linux/
         run: |
-          if [ "${{ matrix.arch }}" == "arm64" ]; then
-            make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bindeb-pkg -j$(nproc)
-          else
-            make bindeb-pkg -j$(nproc)
-          fi
+          make bindeb-pkg -j$(nproc)
 
       - name: Upload config
         uses: actions/upload-artifact@v4
